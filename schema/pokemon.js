@@ -29,6 +29,6 @@ const pokemonSchema = new mongoose.Schema({
         required: true,
     },
 });
+// pokemon est le nom de la collection dans la base de données il y aura donc une collection pokemon
 
-//  pokemon est le nom de la collection dans la base de données MongoDB. il y aura une collection nommée "pokemons"
-export default mongoose.model("pokemon", pokemonSchema);
+export default mongoose.model("Pokemon", pokemonSchema, "pokemons");
