@@ -65,54 +65,38 @@ app.get('/pokemon/search', async (req, res) => {
   }
 });
 
-// GET - Récupérer plusieurs pokemons par IDs
-// Query params: ?ids=1,4,7
-app.get('/pokemon/by-ids', async (req, res) => {
-  try {
-    const { ids } = req.query;
-    if (!ids) {
-      return res.status(400).json({ error: 'Le paramètre "ids" est requis' });
-    }
-    const idArray = ids.split(',').map(Number).filter(n => !isNaN(n));
-    const pokemons = await Pokemon.find({ id: { $in: idArray } }).sort({ id: 1 });
-    res.json(pokemons);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // GET - Filtrer les pokemons par type et stats
-// Query params: ?types=Fire,Water&minHP=50&maxAttack=200&page=1&limit=20
+// Query params: ?types=Fire,Water&minHP=50&maxAttack=100&page=1&limit=20
 app.get('/pokemon/filter', async (req, res) => {
   try {
-    const { types, page: pageParam, limit: limitParam, ...statParams } = req.query;
-    const page = parseInt(pageParam) || 1;
-    const limit = parseInt(limitParam) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const query = {};
+    const filter = {};
 
-    if (types) {
-      const typeArray = types.split(',').filter(Boolean);
-      if (typeArray.length > 0) {
-        query.type = { $in: typeArray };
-      }
+    if (req.query.types) {
+      const types = req.query.types.split(',');
+      filter.type = { $in: types };
     }
 
     const statFields = ['HP', 'Attack', 'Defense', 'SpecialAttack', 'SpecialDefense', 'Speed'];
     for (const stat of statFields) {
-      const minKey = `min${stat}`;
-      const maxKey = `max${stat}`;
-      if (statParams[minKey] || statParams[maxKey]) {
-        const fieldPath = `base.${stat}`;
-        query[fieldPath] = {};
-        if (statParams[minKey]) query[fieldPath].$gte = parseInt(statParams[minKey]);
-        if (statParams[maxKey]) query[fieldPath].$lte = parseInt(statParams[maxKey]);
+      const minVal = req.query[`min${stat}`];
+      const maxVal = req.query[`max${stat}`];
+      if (minVal !== undefined || maxVal !== undefined) {
+        const key = `base.${stat}`;
+        filter[key] = {};
+        if (minVal !== undefined) filter[key].$gte = Number(minVal);
+        if (maxVal !== undefined) filter[key].$lte = Number(maxVal);
       }
     }
 
-    const total = await Pokemon.countDocuments(query);
-    const pokemons = await Pokemon.find(query).sort({ id: 1 }).skip(skip).limit(limit);
+    const total = await Pokemon.countDocuments(filter);
+    const pokemons = await Pokemon.find(filter)
+      .sort({ id: 1 })
+      .skip(skip)
+      .limit(limit);
 
     res.json({
       pokemons,
@@ -126,10 +110,29 @@ app.get('/pokemon/filter', async (req, res) => {
   }
 });
 
-// GET - Liste légère de tous les pokemons (id, name.english, type, image)
+// GET - Récupérer plusieurs pokemons par leurs IDs
+// Query params: ?ids=1,4,7
+app.get('/pokemon/by-ids', async (req, res) => {
+  try {
+    const { ids } = req.query;
+    if (!ids) {
+      return res.status(400).json({ error: 'Le paramètre "ids" est requis' });
+    }
+
+    const idList = ids.split(',').map(Number).filter(n => !isNaN(n));
+    const pokemons = await Pokemon.find({ id: { $in: idList } }).sort({ id: 1 });
+    res.json(pokemons);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET - Liste minimale de tous les pokemons (id, name.english, type, image)
 app.get('/pokemon/list-all', async (req, res) => {
   try {
-    const pokemons = await Pokemon.find({}, { id: 1, 'name.english': 1, type: 1, image: 1, _id: 0 }).sort({ id: 1 });
+    const pokemons = await Pokemon.find({})
+      .select('id name.english type image')
+      .sort({ id: 1 });
     res.json(pokemons);
   } catch (error) {
     res.status(500).json({ error: error.message });
